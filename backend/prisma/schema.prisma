@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -14,7 +13,268 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Post {
+enum Types {
+  Services
+  Products
+  Clients
+  Suppliers
+  Carriers
+  Buys
+  Sells
+  Orders
+  Receipts
+  Expenses
+}
+
+enum Roles {
+  USER
+  CEO
+  ADMIN
+}
+
+enum Permissions {
+  READ
+  WRITE
+  OWNER
+}
+
+enum EntitiesTypes {
+  Client
+  Supplier
+  Carrier
+}
+
+enum FinancesTypes {
+  Receipt
+  Expense
+}
+
+model Notifications {
+  id    Int     @id @default(autoincrement())
+  title String? @db.VarChar(50)
+  desc  String
+  read  Boolean @default(false)
+  type  Types
+
+  user_id Int
+  user    User @relation(fields: [user_id], references: [id])
+
+  created_at DateTime @default(now())
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  name     String @db.VarChar(255)
+  role     Roles  @default(USER)
+  cpf      String @unique @db.VarChar(14)
+  email    String @unique
+  password String
+
+  phone Phone? // relacionamento 1:1 (poderia colocar a fk na tabela de user tambem)
+
+  Ceo   Ceo?
+  Admin Admin?
+
+  notifications Notifications[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Ceo {
   id Int @id @default(autoincrement())
-  title String @db.VarChar(255)
+
+  user_id Int  @unique
+  user    User @relation(fields: [user_id], references: [id])
+
+  enterprise   Enterprise @relation(fields: [enterpriseId], references: [id])
+  enterpriseId Int        @unique
+}
+
+model Admin {
+  id Int @id @default(autoincrement())
+
+  user_id Int  @unique
+  user    User @relation(fields: [user_id], references: [id])
+
+  enterprises AdminToEnterprise[]
+}
+
+model AdminToEnterprise {
+  permissions Permissions[] @default([]) // funciona so no postgres
+
+  admin_id Int
+  admin    Admin @relation(fields: [admin_id], references: [id])
+
+  enterprise_id Int
+  enterprise    Enterprise @relation(fields: [enterprise_id], references: [id])
+
+  created_at DateTime @default(now())
+
+  @@id([admin_id, enterprise_id])
+}
+
+model Enterprise {
+  id        Int     @id @default(autoincrement())
+  name      String  @db.VarChar(255)
+  cnpj      String  @unique @db.VarChar(14)
+  image_url String?
+
+  phones Phone[] // relacionamento 1:n
+
+  address    Address @relation(fields: [address_id], references: [id])
+  address_id Int     @unique
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  Ceo    Ceo? // 1:1 uma empresa tem um CEO
+  admins AdminToEnterprise[] // N:N várias empresas podem ser administradas por vários admins
+
+  entities Entity[]
+
+  services Service[]
+  products Product[]
+}
+
+model Phone {
+  id    Int    @id @default(autoincrement())
+  phone String @unique
+
+  // Telefone de usuário (1:1)
+  user    User? @relation(fields: [user_id], references: [id])
+  user_id Int?  @unique
+
+  // Telefone de empresa (1:N)
+  enterprise    Enterprise? @relation(fields: [enterprise_id], references: [id])
+  enterprise_id Int?        @unique
+}
+
+model Address {
+  id           Int     @id @default(autoincrement())
+  street       String  @db.VarChar(50)
+  number       String  @db.VarChar(10)
+  neighborhood String  @db.VarChar(50)
+  city         String  @db.VarChar(50)
+  state        String  @db.VarChar(50)
+  cep          String  @db.VarChar(10)
+  complement   String? @db.VarChar(200)
+
+  enterprise Enterprise?
+}
+
+model Entity {
+  id        Int           @id @default(autoincrement())
+  name      EntitiesTypes
+  cpf_cnpj  String        @db.VarChar(14)
+  email     String        @unique
+  image_url String?
+
+  enterprise_id Int
+  enterprise    Enterprise @relation(fields: [enterprise_id], references: [id])
+
+  client   Client?
+  supplier Supplier?
+  carrier  Carrier?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+//! TO DO
+model Supplier {
+  id Int @id @default(autoincrement())
+
+  entity_id Int    @unique
+  entity    Entity @relation(fields: [entity_id], references: [id])
+}
+
+//! TO DO
+model Carrier {
+  id Int @id @default(autoincrement())
+
+  entity_id Int    @unique
+  entity    Entity @relation(fields: [entity_id], references: [id])
+}
+
+//! TO DO
+model Client {
+  id Int @id @default(autoincrement())
+
+  entity_id Int    @unique
+  entity    Entity @relation(fields: [entity_id], references: [id])
+}
+
+//! TO DO
+model Sells {
+  id Int @id @default(autoincrement())
+}
+
+//! TO DO
+model Buys {
+  id Int @id @default(autoincrement())
+}
+
+//! TO DO
+model Orders {
+  id Int @id @default(autoincrement())
+}
+
+//! TO DO
+model Service {
+  id    Int     @id @default(autoincrement())
+  name  String  @db.VarChar(100)
+  price Decimal @db.Decimal(10, 2)
+  type  String
+
+  enterprise_id Int
+  enterprise    Enterprise @relation(fields: [enterprise_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+//! TO DO
+model Product {
+  id           Int     @id @default(autoincrement())
+  name         String  @db.VarChar(70)
+  price        Decimal @db.Decimal(10, 2)
+  stock        Int
+  type         String
+  quantity_min Int     @default(0)
+
+  enterprise_id Int
+  enterprise    Enterprise @relation(fields: [enterprise_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Finances {
+  id Int @id @default(autoincrement())
+
+  desc      String
+  value     Decimal       @db.Decimal(10, 2)
+  type      FinancesTypes
+  date      DateTime      @default(now())
+  create_at DateTime      @default(now())
+
+  receipt Receipt?
+  expense Expense?
+}
+
+//! TO DO
+model Receipt {
+  id Int @id @default(autoincrement())
+
+  finances_id Int      @unique
+  finances    Finances @relation(fields: [finances_id], references: [id])
+}
+
+//! TO DO
+model Expense {
+  id Int @id @default(autoincrement())
+
+  finances_id Int      @unique
+  finances    Finances @relation(fields: [finances_id], references: [id])
 }
